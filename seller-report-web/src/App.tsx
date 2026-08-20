@@ -224,6 +224,51 @@ function BhsLogo({ className = "" }: { className?: string }) {
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
+type HeadlineSegment = { text: string; className?: string };
+
+/**
+ * Headline treatment: each word rises out of a clipping mask with a short
+ * stagger. Renders inline, so the caller supplies the actual h1/h2 and its
+ * type styles.
+ *
+ * The mask needs vertical slack for descenders — pb/-mb cancel out in layout
+ * but stop the overflow-hidden box from shearing the tail off a "y" or "p".
+ */
+function AnimatedHeadline({ segments, threshold = 0.25 }: { segments: HeadlineSegment[]; threshold?: number }) {
+  const [ref, inView] = useInView<HTMLSpanElement>(threshold);
+
+  const words = segments.flatMap((segment) =>
+    segment.text
+      .split(" ")
+      .filter(Boolean)
+      .map((word) => ({ word, className: segment.className }))
+  );
+
+  return (
+    <span ref={ref} className="word-rise">
+      {words.map(({ word, className }, i) => (
+        <span key={`${word}-${i}`}>
+          <span className="inline-block overflow-hidden pb-[0.14em] -mb-[0.14em] align-bottom">
+            <span
+              className={`inline-block ${className ?? ""}`}
+              style={{
+                transform: inView ? "translateY(0)" : "translateY(110%)",
+                opacity: inView ? 1 : 0,
+                transition:
+                  `transform 800ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 55}ms,` +
+                  ` opacity 700ms ease-out ${i * 55}ms`,
+              }}
+            >
+              {word}
+            </span>
+          </span>
+          {i < words.length - 1 ? " " : null}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function Eyebrow({ children, tone = "cappuccino" }: { children: React.ReactNode; tone?: "cappuccino" | "cream" }) {
   return (
     <p
@@ -259,7 +304,7 @@ function SectionHeader({
               tone === "dark" ? "text-white" : "text-bhs-offblack"
             }`}
           >
-            {title}
+            <AnimatedHeadline segments={[{ text: title }]} />
           </h2>
         </div>
         {children && <div className="lg:max-w-md lg:text-right shrink-0">{children}</div>}
@@ -308,6 +353,48 @@ function useInView<T extends Element>(threshold = 0.2) {
   }, [threshold]);
 
   return [ref, inView] as const;
+}
+
+/**
+ * Returns a negative pixel offset that grows as the page scrolls down, easing
+ * to `-strength` once `distance` has been scrolled.
+ *
+ * Deliberately keyed to absolute scroll depth rather than the element's
+ * viewport position: this drives an element sitting near the top of the
+ * document, which is already high in the viewport at rest, so a
+ * position-based mapping would spend most of its range before the reader
+ * scrolls at all.
+ *
+ * rAF-coalesced and applied without a CSS transition, so it tracks the wheel
+ * instead of lagging behind it. Stays at 0 under prefers-reduced-motion.
+ */
+function useScrollDrift(distance = 700, strength = 40) {
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const progress = Math.min(1, Math.max(0, window.scrollY / distance));
+      // easeOutCubic — most of the travel happens early, then settles.
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setOffset(-eased * strength);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [distance, strength]);
+
+  return offset;
 }
 
 /** Fades and lifts its children in on first scroll into view. */
@@ -643,6 +730,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mastheadHidden, setMastheadHidden] = useState(false);
   const lastScrollY = useRef(0);
+  const agentCardOffset = useScrollDrift(700, 44);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -821,7 +909,10 @@ export default function App() {
           <div className="relative z-10 h-full flex flex-col justify-end pb-14 md:pb-20 px-6 md:px-10 max-w-[1600px] mx-auto">
             <Eyebrow tone="cream">Brown Harris Stevens — Seller Report</Eyebrow>
             <h1 className="font-display text-[2.75rem] md:text-[5.5rem] leading-[0.98] tracking-[0.01em] text-white max-w-4xl">
-              {property.name} <span className="text-bhs-marigold">{property.unit}</span>
+              <AnimatedHeadline
+                segments={[{ text: property.name }, { text: property.unit, className: "text-bhs-marigold" }]}
+                threshold={0}
+              />
             </h1>
             <p className="text-base md:text-lg font-light text-white/70 mt-4">{property.city}</p>
 
@@ -870,39 +961,44 @@ export default function App() {
               </div>
             </div>
 
-            {/* Agent Card */}
-            <div className="bg-bhs-offblack p-8 flex flex-col">
-              <p className="eyebrow text-[10px] text-bhs-cappuccino mb-6">Your Listing Agent</p>
-              <img
-                src={property.agent.photo}
-                alt={property.agent.name}
-                className="w-20 h-20 object-cover mb-5"
-              />
-              <p className="font-display text-2xl text-white leading-tight">{property.agent.name}</p>
-              <p className="text-xs font-light text-bhs-gray-700w mt-2 leading-relaxed">{property.agent.title}</p>
-              <div className="h-px bg-white/15 my-6" />
-              <a
-                href={`tel:${property.agent.phone}`}
-                className="flex items-center gap-3 text-sm font-light text-white/80 hover:text-bhs-marigold transition-colors"
-              >
-                <IconPhone size={17} stroke={1.25} />
-                {property.agent.phone}
-              </a>
-              <a
-                href={`mailto:${property.agent.email}`}
-                className="flex items-center gap-3 text-sm font-light text-white/80 hover:text-bhs-marigold transition-colors mt-3 break-all"
-              >
-                <IconMail size={17} stroke={1.25} />
-                {property.agent.email}
-              </a>
-              <div className="mt-auto pt-10 grid grid-cols-2 gap-8">
-                <div>
-                  <span className="font-display text-3xl text-bhs-marigold block leading-none">24</span>
-                  <span className="eyebrow text-[9px] text-white/45 mt-2 block">Years</span>
-                </div>
-                <div>
-                  <span className="font-display text-3xl text-bhs-marigold block leading-none">$2.1B</span>
-                  <span className="eyebrow text-[9px] text-white/45 mt-2 block">Sales</span>
+            {/* Agent Card — lifts over the hero and drifts up on scroll */}
+            <div
+              className="lg:-mt-40 xl:-mt-48 relative z-20 self-start will-change-transform"
+              style={{ transform: `translate3d(0, ${agentCardOffset}px, 0)` }}
+            >
+              <div className="bg-bhs-offblack p-8 flex flex-col shadow-[0_18px_50px_-12px_rgba(0,0,0,0.55)]">
+                <p className="eyebrow text-[10px] text-bhs-cappuccino mb-6">Your Listing Agent</p>
+                <img
+                  src={property.agent.photo}
+                  alt={property.agent.name}
+                  className="w-20 h-20 object-cover mb-5"
+                />
+                <p className="font-display text-2xl text-white leading-tight">{property.agent.name}</p>
+                <p className="text-xs font-light text-bhs-gray-700w mt-2 leading-relaxed">{property.agent.title}</p>
+                <div className="h-px bg-white/15 my-6" />
+                <a
+                  href={`tel:${property.agent.phone}`}
+                  className="flex items-center gap-3 text-sm font-light text-white/80 hover:text-bhs-marigold transition-colors"
+                >
+                  <IconPhone size={17} stroke={1.25} />
+                  {property.agent.phone}
+                </a>
+                <a
+                  href={`mailto:${property.agent.email}`}
+                  className="flex items-center gap-3 text-sm font-light text-white/80 hover:text-bhs-marigold transition-colors mt-3 break-all"
+                >
+                  <IconMail size={17} stroke={1.25} />
+                  {property.agent.email}
+                </a>
+                <div className="pt-10 grid grid-cols-2 gap-8">
+                  <div>
+                    <span className="font-display text-3xl text-bhs-marigold block leading-none">24</span>
+                    <span className="eyebrow text-[9px] text-white/45 mt-2 block">Years</span>
+                  </div>
+                  <div>
+                    <span className="font-display text-3xl text-bhs-marigold block leading-none">$2.1B</span>
+                    <span className="eyebrow text-[9px] text-white/45 mt-2 block">Sales</span>
+                  </div>
                 </div>
               </div>
             </div>
