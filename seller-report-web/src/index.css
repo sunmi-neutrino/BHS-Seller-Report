@@ -1,0 +1,212 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+@import 'tailwindcss';
+
+/* Radikal (Nootype) — the BHS R3 sans. Self-hosted; see scripts/build-fonts.mjs. */
+@font-face {
+  font-family: 'Radikal';
+  src: url('/fonts/radikal-300.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Radikal';
+  src: url('/fonts/radikal-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Radikal';
+  src: url('/fonts/radikal-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Radikal';
+  src: url('/fonts/radikal-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  /* Main — BHS R3 style guide */
+  --color-bhs-black: #000000;
+  --color-bhs-offblack: #181818;
+  --color-bhs-white: #ffffff;
+  --color-bhs-cream: #faf9f7;
+  --color-bhs-coolgray: #53555a;
+  --color-bhs-cappuccino: #95775d;
+  --color-bhs-marigold: #daaa00;
+  --color-bhs-bluegray: #2c2e35;
+
+  /* Accents */
+  --color-bhs-yellow: #d2aa39;
+  --color-bhs-blue: #3d5c67;
+  --color-bhs-maroon: #702f48;
+  --color-bhs-brown: #807570;
+  --color-bhs-green: #627e72;
+
+  /* Neutrals */
+  --color-bhs-gray-100: #f6f6f4;
+  --color-bhs-gray-200: #f4f4f4;
+  --color-bhs-gray-300: #e6e6e6;
+  --color-bhs-gray-400: #ece6db;
+  --color-bhs-gray-500: #d9d8d6;
+  --color-bhs-gray-600: #c5c5c5;
+  --color-bhs-gray-700w: #b6afa7;
+  --color-bhs-gray-700: #aeaeae;
+  --color-bhs-gray-900: #8d8680;
+
+  --font-display: 'Playfair Display', 'FreightBig Pro', Georgia, serif;
+  --font-sans: 'Radikal', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Radikal', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 300;
+  font-stretch: normal;
+  background-color: #faf9f7;
+  color: #181818;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Clears the fixed masthead when jumping to a section */
+section[id] {
+  scroll-margin-top: 88px;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #95775d;
+}
+
+/* H6 / eyebrow — Radikal Reg 20, all caps, tracked */
+.eyebrow {
+  font-family: 'Radikal', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  font-stretch: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+/**
+ * Location map modules — white at rest, inverting to off-black on hover.
+ *
+ * Every colour in the panel (panel, type, bar tracks, map land, borders,
+ * markers) is a variable so a single :hover rule flips the whole module. The
+ * SVGs read these via fill="var(--map-land)" etc., which keeps the palette in
+ * one place instead of duplicating light/dark branches in the components.
+ */
+.map-module {
+  --panel: #ffffff;
+  --ink: #181818;
+  --eyebrow-ink: #95775d;
+  --track: #d9d8d6;
+  --bar: #95775d;
+  --pct-ink: #95775d;
+  --map-land: #ece6db;
+  --map-border: #b6afa7;
+  --map-border-opacity: 0.75;
+  --marker: #95775d;
+  --marker-top: #181818;
+  --halo: #daaa00;
+  --halo-opacity: 0.16;
+
+  background-color: var(--panel);
+  transition: background-color 0.4s ease;
+}
+
+.map-module:hover {
+  --panel: #181818;
+  --ink: #ffffff;
+  --eyebrow-ink: #b6afa7;
+  --track: rgba(255, 255, 255, 0.15);
+  --bar: #daaa00;
+  --pct-ink: #daaa00;
+  --map-land: rgba(255, 255, 255, 0.08);
+  --map-border: #ffffff;
+  --map-border-opacity: 0.3;
+  --marker: #daaa00;
+  --marker-top: #ffffff;
+  --halo: #daaa00;
+  --halo-opacity: 0.28;
+}
+
+/* Presentation attributes are CSS properties, so these animate with the flip. */
+.map-module svg path {
+  transition:
+    fill 0.4s ease,
+    stroke 0.4s ease,
+    stroke-opacity 0.4s ease;
+}
+
+/* Scroll-reveal for data graphics — see useInView in App.tsx */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.7s ease-out,
+    transform 0.7s ease-out;
+}
+.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #ffffff;
+  }
+  section[id] {
+    scroll-margin-top: 0;
+    break-inside: avoid;
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* Keep dark panels legible on paper without burning through toner. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
