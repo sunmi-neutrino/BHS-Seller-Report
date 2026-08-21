@@ -98,17 +98,17 @@ const syndicatedSites = [
 ];
 
 const emailMetrics = [
-  { type: "Listing Alert Emails", Icon: IconBell, count: "18,402", description: "Times your listing appeared in buyer alert emails" },
-  { type: "Portfolio Newsletters", Icon: IconFolders, count: "9,871", description: "Included in agent portfolio email campaigns" },
-  { type: "Open House Announcements", Icon: IconHome, count: "5,344", description: "Featured in open house notification emails" },
-  { type: "Just Listed Campaigns", Icon: IconSparkles, count: "12,650", description: "Distributed via Just Listed email blasts" },
+  { type: "Listing Alert Emails", Icon: IconBell, count: 18402, description: "Times your listing appeared in buyer alert emails" },
+  { type: "Portfolio Newsletters", Icon: IconFolders, count: 9871, description: "Included in agent portfolio email campaigns" },
+  { type: "Open House Announcements", Icon: IconHome, count: 5344, description: "Featured in open house notification emails" },
+  { type: "Just Listed Campaigns", Icon: IconSparkles, count: 12650, description: "Distributed via Just Listed email blasts" },
 ];
 
 const viewMetrics = [
-  { type: "Property Page Views", count: "7,234", trend: "+12%", Icon: IconEye },
-  { type: "Search Results Appearances", count: "38,102", trend: "+8%", Icon: IconSearch },
-  { type: "Report Views", count: "1,847", trend: "+22%", Icon: IconChartBar },
-  { type: "SLW Traffic", count: "4,921", trend: "+15%", Icon: IconWorld },
+  { type: "Property Page Views", count: 7234, trend: "+12%", Icon: IconEye },
+  { type: "Search Results Appearances", count: 38102, trend: "+8%", Icon: IconSearch },
+  { type: "Report Views", count: 1847, trend: "+22%", Icon: IconChartBar },
+  { type: "SLW Traffic", count: 4921, trend: "+15%", Icon: IconWorld },
 ];
 
 const worldLocations = [
@@ -317,7 +317,67 @@ function Lede({ children }: { children: React.ReactNode }) {
   return <p className="text-[15px] md:text-base font-light leading-[1.6] text-bhs-coolgray">{children}</p>;
 }
 
-function StatCard({ value, label, sub }: { value: string; label: string; sub?: string }) {
+/**
+ * Counts up to `value` once scrolled into view.
+ *
+ * Playfair Display has no tabular figures — `font-variant-numeric: tabular-nums`
+ * is a no-op in it, and its digits range from 19px ("1") to 31px ("0") at
+ * display sizes. Left unhandled, a ticking number reflows its own box on almost
+ * every frame and drags neighbouring layout with it.
+ *
+ * So the box is sized by an invisible placeholder built from the final string
+ * with every digit swapped for "0", the widest glyph. Intermediate values never
+ * have more digits than the final one, so that placeholder is always at least
+ * as wide and the box stays put for the whole run.
+ */
+function CountUp({
+  value,
+  prefix = "",
+  suffix = "",
+  duration = 1500,
+}: {
+  value: number;
+  prefix?: string;
+  suffix?: string;
+  duration?: number;
+}) {
+  const [ref, inView] = useInView<HTMLSpanElement>(0.35);
+  const [shown, setShown] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setShown(value);
+      return;
+    }
+
+    let frame = 0;
+    let startedAt: number | null = null;
+    const tick = (now: number) => {
+      if (startedAt === null) startedAt = now;
+      const progress = Math.min(1, (now - startedAt) / duration);
+      // easeOutCubic — fast off the mark, settling onto the final figure.
+      setShown(value * (1 - Math.pow(1 - progress, 3)));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [inView, value, duration]);
+
+  const final = `${prefix}${value.toLocaleString("en-US")}${suffix}`;
+  const current = `${prefix}${Math.round(shown).toLocaleString("en-US")}${suffix}`;
+
+  return (
+    <span ref={ref} className="inline-grid">
+      <span aria-hidden className="invisible col-start-1 row-start-1">
+        {final.replace(/\d/g, "0")}
+      </span>
+      <span className="col-start-1 row-start-1">{current}</span>
+    </span>
+  );
+}
+
+function StatCard({ value, label, sub }: { value: React.ReactNode; label: string; sub?: string }) {
   return (
     <div className="bg-white border border-bhs-gray-500 p-7 md:p-8 flex flex-col gap-3">
       <span className="font-display text-[2.5rem] md:text-[3.25rem] leading-none text-bhs-offblack">{value}</span>
@@ -697,6 +757,44 @@ function seeded(i: number) {
   return x - Math.floor(x);
 }
 
+/** Syndication partners; counts and mini-bars stagger in together on scroll. */
+function PartnerPlatforms() {
+  const [ref, inView] = useInView<HTMLDivElement>(0.15);
+  const peak = Math.max(...syndicatedSites.map((s) => s.views));
+
+  return (
+    <div ref={ref} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-px bg-bhs-gray-500">
+      {syndicatedSites.map((site, i) => (
+        <div
+          key={site.name}
+          className="bg-white p-6 flex items-center justify-between gap-4 hover:bg-bhs-gray-100 transition-colors duration-300"
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-11 h-11 border border-bhs-gray-500 flex items-center justify-center shrink-0">
+              <span className="text-[10px] font-medium tracking-wider text-bhs-cappuccino">{site.logo}</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-normal text-bhs-offblack truncate">{site.name}</p>
+              <p className="text-xs font-light text-bhs-gray-900">
+                <CountUp value={site.views} duration={1100} /> views
+              </p>
+            </div>
+          </div>
+          <div className="w-[3px] h-10 bg-bhs-gray-500 flex flex-col justify-end shrink-0">
+            <div
+              className="w-full bg-bhs-marigold"
+              style={{
+                height: inView ? `${(site.views / peak) * 100}%` : "0%",
+                transition: `height 800ms cubic-bezier(0.22, 1, 0.36, 1) ${i * 45}ms`,
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** 90-day page-view bars; each column grows from the baseline on scroll in. */
 function Sparkline() {
   const [ref, inView] = useInView<HTMLDivElement>(0.25);
@@ -773,10 +871,8 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const totalSyndicatedViews = syndicatedSites.reduce((a, b) => a + b.views, 0).toLocaleString();
-  const totalEmailsSent = emailMetrics
-    .reduce((a, b) => a + parseInt(b.count.replace(/,/g, "")), 0)
-    .toLocaleString();
+  const totalSyndicatedViews = syndicatedSites.reduce((a, b) => a + b.views, 0);
+  const totalEmailsSent = emailMetrics.reduce((a, b) => a + b.count, 0);
 
   return (
     <div className="min-h-screen bg-bhs-cream text-bhs-offblack">
@@ -1017,38 +1113,25 @@ export default function App() {
           </SectionHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 mb-16">
-            <StatCard value={totalSyndicatedViews} label="Total Syndicated Views" sub="Across all partner platforms" />
-            <StatCard value={syndicatedSites.length.toString()} label="Syndicated Sites" sub="Premium partner network" />
-            <StatCard value="98%" label="Coverage Rate" sub="Of major buyer search portals" />
+            <StatCard
+              value={<CountUp value={totalSyndicatedViews} />}
+              label="Total Syndicated Views"
+              sub="Across all partner platforms"
+            />
+            <StatCard
+              value={<CountUp value={syndicatedSites.length} />}
+              label="Syndicated Sites"
+              sub="Premium partner network"
+            />
+            <StatCard
+              value={<CountUp value={98} suffix="%" />}
+              label="Coverage Rate"
+              sub="Of major buyer search portals"
+            />
           </div>
 
           <p className="eyebrow text-[10px] text-bhs-gray-900 mb-6">Partner Platforms</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-px bg-bhs-gray-500">
-            {syndicatedSites.map((site) => (
-              <div
-                key={site.name}
-                className="bg-white p-6 flex items-center justify-between gap-4 hover:bg-bhs-gray-100 transition-colors duration-300"
-              >
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-11 h-11 border border-bhs-gray-500 flex items-center justify-center shrink-0">
-                    <span className="text-[10px] font-medium tracking-wider text-bhs-cappuccino">{site.logo}</span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-normal text-bhs-offblack truncate">{site.name}</p>
-                    <p className="text-xs font-light text-bhs-gray-900 tabular-nums">
-                      {site.views.toLocaleString()} views
-                    </p>
-                  </div>
-                </div>
-                <div className="w-[3px] h-10 bg-bhs-gray-500 flex flex-col justify-end shrink-0">
-                  <div
-                    className="w-full bg-bhs-marigold transition-all duration-700"
-                    style={{ height: `${(site.views / 4821) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          <PartnerPlatforms />
         </section>
 
         {/* ── Section 3: Email Campaigns ── */}
@@ -1056,7 +1139,7 @@ export default function App() {
           <SectionHeader eyebrow="Digital Outreach" title="Email Campaigns">
             <div className="lg:text-right">
               <span className="font-display text-5xl md:text-6xl text-bhs-offblack leading-none block">
-                {totalEmailsSent}
+                <CountUp value={totalEmailsSent} />
               </span>
               <span className="eyebrow text-[10px] text-bhs-cappuccino mt-3 block">Total Emails Sent</span>
             </div>
@@ -1068,7 +1151,9 @@ export default function App() {
                 <Icon size={30} stroke={1} className="text-bhs-cappuccino shrink-0 mt-1" />
                 <div className="flex-1">
                   <p className="font-display text-2xl text-bhs-offblack leading-tight">{type}</p>
-                  <p className="font-display text-4xl text-bhs-cappuccino mt-4 leading-none tabular-nums">{count}</p>
+                  <p className="font-display text-4xl text-bhs-cappuccino mt-4 leading-none">
+                    {count.toLocaleString("en-US")}
+                  </p>
                   <p className="text-sm font-light text-bhs-coolgray mt-4 leading-relaxed">{description}</p>
                 </div>
               </div>
@@ -1086,7 +1171,9 @@ export default function App() {
             {viewMetrics.map(({ type, count, trend, Icon }) => (
               <div key={type} className="bg-bhs-offblack p-8 flex flex-col gap-5 border-r border-white/12 last:border-r-0">
                 <Icon size={28} stroke={1} className="text-bhs-cappuccino" />
-                <span className="font-display text-4xl text-white leading-none tabular-nums">{count}</span>
+                <span className="font-display text-4xl text-white leading-none">
+                  <CountUp value={count} />
+                </span>
                 <span className="eyebrow text-[10px] text-bhs-gray-700w leading-relaxed">{type}</span>
                 <span className="flex items-center gap-2 text-xs font-light text-bhs-marigold mt-auto">
                   <IconTrendingUp size={15} stroke={1.25} />
@@ -1153,9 +1240,11 @@ export default function App() {
             {marketingItems.map(({ category, Icon, accent, items }) => (
               <div key={category}>
                 <div className="flex items-center gap-5 mb-8 pb-6 border-b border-bhs-gray-500">
-                  <Icon size={28} stroke={1} style={{ color: accent }} className="shrink-0" />
+                  <Icon size={34} stroke={1} style={{ color: accent }} className="shrink-0" />
                   <div>
-                    <p className="font-display text-2xl text-bhs-offblack leading-tight">{category}</p>
+                    <p className="font-display text-3xl md:text-[2.25rem] text-bhs-offblack leading-tight">
+                      {category}
+                    </p>
                     <p className="text-xs font-light text-bhs-gray-900 mt-1">{items.length} placements</p>
                   </div>
                 </div>
